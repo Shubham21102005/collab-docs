@@ -6,7 +6,7 @@ export type ID = {
 export function idToString(id: ID): string {
   return `${id.client}:${id.clock}`;
 }
-export function idEquals(a: id | null, b: id | null): boolean {
-  if (a == null || b == null) return a === b;
-  return a.client == b.client && a.clock == b.clock;
+export function idEquals(a: ID | null, b: ID | null): boolean {
+  if (a === null || b === null) return a === b;
+  return a.client === b.client && a.clock === b.clock;
 }

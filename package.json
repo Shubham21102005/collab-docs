@@ -9,7 +9,7 @@
   "scripts": {
     "test": "vitest run",
     "test:watch": "vitest",
-    "typecheck": "tsc --build"
+    "typecheck": "tsc -p packages/crdt"
   },
   "devDependencies": {
     "@types/node": "^26.5.1",
