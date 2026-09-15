@@ -32,6 +32,7 @@ export class Doc {
   private clock = 0;
   private items: Item[] = [];
   private byId = new Map<string, Item>(); //id-> item, for origin lookup
+  private pending: Op[] = [];
 
   constructor(client: string) {
     this.client = client;
@@ -54,6 +55,10 @@ export class Doc {
   get size(): number {
     //actual size, including tombstones
     return this.items.length;
+  }
+
+  get pendingCount(): number {
+    return this.pending.length;
   }
 
   insertAt(index: number, content: string): InsertOp {
@@ -86,16 +91,50 @@ export class Doc {
     return op;
   }
 
-  integrate(op: Op): void {
+  private integrate(op: Op): void {
+    if (!this.canApply(op)) {
+      this.pending.push(op);
+      return;
+    }
+    this.apply(op);
+    this.drainPending();
+  }
+
+  private apply(op: Op): void {
     switch (op.type) {
       case "insert":
         this.integrateInsert(op);
         break;
       case "delete":
+        this.integrateDelete(op);
         break;
       default:
         const unreachable: never = op;
         throw new Error(`Unknown Operation ${JSON.stringify(unreachable)}`);
+    }
+  }
+
+  private canApply(op: Op): boolean {
+    switch (op.type) {
+      case "insert":
+        return op.origin === null || this.byId.has(idToString(op.origin));
+      case "delete":
+        return this.byId.has(idToString(op.id));
+    }
+  }
+  private drainPending(): void {
+    let prog = true; // denote progress, one op can make others applicable, stop obly when pull pass applies nothing
+    while (prog) {
+      prog = false;
+      for (let i = 0; i < this.pending.length; i++) {
+        const op = this.pending[i];
+        if (this.canApply(op)) {
+          this.pending.splice(i, 1);
+          i--; //array shifted after splice
+          this.apply(op);
+          prog = true;
+        }
+      }
     }
   }
 
