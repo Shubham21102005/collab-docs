@@ -91,7 +91,7 @@ export class Doc {
     return op;
   }
 
-  private integrate(op: Op): void {
+  integrate(op: Op): void {
     if (!this.canApply(op)) {
       this.pending.push(op);
       return;
