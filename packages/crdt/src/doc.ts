@@ -14,7 +14,12 @@ export type InsertOp = {
   content: string;
 };
 
-export type Op = InsertOp;
+export type DeleteOp = {
+  type: "delete";
+  id: ID;
+};
+
+export type Op = InsertOp | DeleteOp;
 
 function winSlotOver(a: ID, b: ID): boolean {
   if (a.clock !== b.clock) return a.clock > b.clock; //newer value must win always
@@ -46,6 +51,11 @@ export class Doc {
     return n;
   }
 
+  get size(): number {
+    //actual size, including tombstones
+    return this.items.length;
+  }
+
   insertAt(index: number, content: string): InsertOp {
     if (content.length !== 1) {
       throw new RangeError("inserAt takes exactly one character");
@@ -67,8 +77,29 @@ export class Doc {
     this.integrate(op);
     return op;
   }
+  deleteAt(index: number): DeleteOp {
+    if (index < 0 || index > this.length) {
+      throw new RangeError(`index ${index} out of range `);
+    }
+    const op: DeleteOp = { type: "delete", id: this.visibleItemAt(index).id };
+    this.integrate(op);
+    return op;
+  }
 
-  integrate(op: InsertOp): void {
+  integrate(op: Op): void {
+    switch (op.type) {
+      case "insert":
+        this.integrateInsert(op);
+        break;
+      case "delete":
+        break;
+      default:
+        const unreachable: never = op;
+        throw new Error(`Unknown Operation ${JSON.stringify(unreachable)}`);
+    }
+  }
+
+  integrateInsert(op: InsertOp): void {
     const key = idToString(op.id);
     if (this.byId.has(key)) return; //duplicate op
 
@@ -94,6 +125,14 @@ export class Doc {
     };
     this.items.splice(pos, 0, item);
     this.byId.set(key, item);
+  }
+
+  integrateDelete(op: DeleteOp): void {
+    const item = this.byId.get(idToString(op.id));
+    if (item === undefined) {
+      throw new Error(`Cannot delete, ${idToString(op.id)} not present`);
+    }
+    item.deleted = true;
   }
   private visibleItemAt(n: number): Item {
     let seen = 0;
